@@ -4,6 +4,8 @@ Backend der RefCard05 Full-Stack-Anwendung auf AWS: Spring Boot + Amazon RDS (Ma
 
 Frontend-Repo: [refcard05-frontend](../../../refcard05-frontend)
 
+> **Mitwirkende:** Offene Punkte stehen in [TODO.md](TODO.md).
+
 > **Template:** Der Spring-Boot-Code (Vorgabe: [RefCard-03-be-SpringBootBusinessTrips v1-start](https://github.com/bbwlc/RefCard-03-be-SpringBootBusinessTrips/tree/v1-start) inkl. Bilder-Endpoint aus RefCard04) wird noch hinzugefügt. Solange kein `pom.xml` existiert, überspringt die Pipeline Build und Deploy.
 
 ## Struktur
