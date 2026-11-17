@@ -191,10 +191,15 @@ Typischer Fehler bei abgelaufenen Secrets: `ExpiredToken` / `The security token 
 
 Beide Repos nebeneinander klonen:
 
+```bash
+git clone https://github.com/JulianNagel/refcard05-backend.git
+git clone https://github.com/JulianNagel/refcard05-frontend.git
 ```
-IdeaProjects/
-├── RefCard-03-be-SpringBootBusinessTrips
-└── refcard-03-fe-react-vite
+
+```
+irgendein-ordner/
+├── refcard05-backend
+└── refcard05-frontend
 ```
 
 Dann im Backend-Repo:
@@ -211,6 +216,7 @@ docker compose -f compose/docker-compose.yml up --build
 
 - Startreihenfolge über Healthchecks: erst MariaDB, dann das Backend und erst wenn dieses `UP` ist, das Frontend.
 - Lokal gibt es kein S3. Die Fotos landen im Docker-Volume `photos`, die DB-Daten im Volume `db-data`.
+- Heisst der Frontend-Ordner anders: `FRONTEND_DIR=../../<ordner> docker compose -f compose/docker-compose.yml up --build`
 - Stoppen mit `docker compose -f compose/docker-compose.yml down` (`-v` löscht zusätzlich die Daten).
 
 ![docker compose ps](img/21-compose-ps.png)
