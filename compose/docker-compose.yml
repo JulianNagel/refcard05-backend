@@ -1,0 +1,57 @@
+# Local full stack: frontend + backend + MariaDB
+# Expects both repos cloned side by side:
+#   ./refcard05-backend
+#   ./refcard05-frontend
+# Start: cd refcard05-backend/compose && docker compose up --build
+
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: refcard
+      MARIADB_USER: refcard
+      MARIADB_PASSWORD: refcard
+      MARIADB_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ..
+    # or use the ECR image: image: <account>.dkr.ecr.us-east-1.amazonaws.com/refcard05-backend:latest
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: refcard
+      DB_USER: refcard
+      DB_PASSWORD: refcard
+      STORAGE_PATH: /data/images
+    volumes:
+      - images:/data/images
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../../refcard05-frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    # or use the ECR image: image: <account>.dkr.ecr.us-east-1.amazonaws.com/refcard05-frontend:latest
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
+  images:

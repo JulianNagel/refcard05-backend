@@ -1,0 +1,45 @@
+{
+  "family": "refcard05-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::REPLACE_ACCOUNT_ID:role/LabRole",
+  "taskRoleArn": "arn:aws:iam::REPLACE_ACCOUNT_ID:role/LabRole",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "REPLACE_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/refcard05-backend:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "S3_BUCKET", "value": "REPLACE_BUCKET_NAME" },
+        { "name": "DB_PORT", "value": "3306" },
+        { "name": "DB_NAME", "value": "refcard" }
+      ],
+      "secrets": [
+        { "name": "DB_HOST", "valueFrom": "arn:aws:ssm:us-east-1:REPLACE_ACCOUNT_ID:parameter/refcard05/DB_HOST" },
+        { "name": "DB_USER", "valueFrom": "arn:aws:ssm:us-east-1:REPLACE_ACCOUNT_ID:parameter/refcard05/DB_USER" },
+        { "name": "DB_PASSWORD", "valueFrom": "arn:aws:ssm:us-east-1:REPLACE_ACCOUNT_ID:parameter/refcard05/DB_PASSWORD" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/refcard05-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}
