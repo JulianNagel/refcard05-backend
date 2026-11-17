@@ -1,0 +1,3 @@
+{"Version":"2012-10-17","Statement":[{"Sid":"OnlyBackendTaskRoleAndLabAdmin","Effect":"Deny","Principal":"*",
+"Action":["s3:GetObject","s3:PutObject","s3:DeleteObject"],"Resource":"arn:aws:s3:::biztrips-photos-851725276744/*",
+"Condition":{"ArnNotLike":{"aws:PrincipalArn":["arn:aws:iam::851725276744:role/LabRole","arn:aws:iam::851725276744:role/voclabs"]}}}]}

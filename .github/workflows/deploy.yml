@@ -3,8 +3,16 @@ name: Test, Build & Deploy
 on:
   push:
     branches: [main]
+    tags: ['v*.*.*']
   pull_request:
     branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: biztrips-backend
+  ECS_CLUSTER: biztrips-cluster
+  ECS_SERVICE: biztrips-backend-service
+  CONTAINER_NAME: biztrips-backend
 
 jobs:
   test:
@@ -50,9 +58,15 @@ jobs:
     name: Image nach ECR pushen und ECS-Service aktualisieren
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
+
+      - name: Version aus Git-Tag ableiten
+        id: version
+        run: |
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: AWS-Credentials einrichten (AWS Academy Learner Lab)
         uses: aws-actions/configure-aws-credentials@v4
@@ -60,7 +74,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: eu-central-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Bei ECR anmelden
         id: ecr-login
@@ -68,28 +82,36 @@ jobs:
 
       - name: Image bauen und nach ECR pushen
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          ECR_REPOSITORY: biztrips-backend
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}
         run: |
           docker build \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" .
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+            -t "$IMAGE:${{ steps.version.outputs.version }}" \
+            -t "$IMAGE:${{ steps.version.outputs.sha }}" \
+            -t "$IMAGE:latest" .
+          docker push --all-tags "$IMAGE"
 
       - name: Task-Definition mit neuem Image aktualisieren
         id: render-task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: biztrips-backend
-          image: ${{ steps.ecr-login.outputs.registry }}/biztrips-backend:${{ github.sha }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.version.outputs.version }}
 
       - name: ECS-Service deployen
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-          cluster: biztrips-backend-cluster
-          service: biztrips-backend-service
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
           wait-for-service-stability: true
+
+      - name: Health-Check nach Deploy
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "${{ vars.APP_URL }}actuator/health" | grep -q '"status":"UP"'; then
+              echo "Backend ${{ steps.version.outputs.version }} ist UP"; exit 0
+            fi
+            echo "Noch nicht UP, Versuch $i/20"; sleep 15
+          done
+          echo "::error::Backend nach Deploy nicht gesund (${{ vars.APP_URL }}actuator/health)"; exit 1

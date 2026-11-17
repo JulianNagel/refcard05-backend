@@ -4,22 +4,28 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::211125356770:role/LabRole",
+  "executionRoleArn": "arn:aws:iam::851725276744:role/LabRole",
+  "taskRoleArn": "arn:aws:iam::851725276744:role/LabRole",
   "containerDefinitions": [
     {
       "name": "biztrips-backend",
-      "image": "211125356770.dkr.ecr.us-east-1.amazonaws.com/biztrips-backend:latest",
+      "image": "851725276744.dkr.ecr.us-east-1.amazonaws.com/biztrips-backend:latest",
       "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
       "essential": true,
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "mariadb" },
-        { "name": "SPRING_DATASOURCE_URL", "value": "jdbc:mariadb://biztrips-backend-db.ctgyqyg6io6a.us-east-1.rds.amazonaws.com:3306/db_biztrips" },
-        { "name": "SPRING_DATASOURCE_USERNAME", "value": "admin" }
+        { "name": "DB_HOST", "value": "biztrips-db.cpio884825o3.us-east-1.rds.amazonaws.com" },
+        { "name": "DB_PORT", "value": "3306" },
+        { "name": "DB_NAME", "value": "db_biztrips" },
+        { "name": "DB_USER", "value": "admin" },
+        { "name": "DB_SSL_MODE", "value": "trust" },
+        { "name": "APP_STORAGE_S3_BUCKET", "value": "biztrips-photos-851725276744" },
+        { "name": "AWS_REGION", "value": "us-east-1" }
       ],
       "secrets": [
         {
-          "name": "SPRING_DATASOURCE_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:211125356770:secret:biztrips-backend-db-password"
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:851725276744:secret:biztrips-db-password-O1Z4D5"
         }
       ],
       "logConfiguration": {

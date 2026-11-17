@@ -7,10 +7,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +29,9 @@ public class EmployeeController {
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private FileStorageService fileStorageService;
 
 	@PostMapping("/signIn")
 	@ResponseStatus(HttpStatus.OK)
@@ -84,6 +91,32 @@ public class EmployeeController {
 			newItem.setId(id);
 			return employeeRepository.save(newItem);
 		});
+	}
+
+	@PostMapping("/employees/{id}/photo")
+	ResponseEntity<String> uploadPhoto(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+		Employee employee = employeeRepository.findById(id).orElseThrow(() -> new TriptNotFoundException(id));
+		try {
+			employee.setProfilePictureFilename(fileStorageService.store(file));
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(e.getMessage());
+		} catch (S3Exception e) {
+			log.error("S3 upload failed", e);
+			return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Photo storage not available: " + e.awsErrorDetails().errorCode());
+		}
+		employeeRepository.save(employee);
+		return ResponseEntity.ok(employee.getProfilePictureFilename());
+	}
+
+	@GetMapping("/employees/{id}/photo")
+	ResponseEntity<byte[]> downloadPhoto(@PathVariable Long id) throws IOException {
+		Employee employee = employeeRepository.findById(id).orElseThrow(() -> new TriptNotFoundException(id));
+		String key = employee.getProfilePictureFilename();
+		if (key == null) {
+			return ResponseEntity.notFound().build();
+		}
+		MediaType type = key.endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+		return ResponseEntity.ok().contentType(type).body(fileStorageService.load(key));
 	}
 
 	@DeleteMapping("/employees/{id}")
