@@ -8,6 +8,8 @@ ECS-Service. Die Datenbank läuft auf RDS, Mitarbeiterfotos landen in S3. Ein Lo
 - Compose: [`compose/`](../compose/docker-compose.yml) in diesem Repo
 - App: http://biztrips-alb-1775505033.us-east-1.elb.amazonaws.com/
 
+![App im Browser über die ALB-URL](img/18-app-frontend.png)
+
 ## So hängt alles zusammen
 
 ```
@@ -30,6 +32,8 @@ Security Groups (nur das Nötigste ist offen):
 | `biztrips-be-sg` | Port 8080 nur vom ALB |
 | `biztrips-db-sg` | Port 3306 nur vom Backend |
 
+ALB-Regeln: `/v1/*` und `/actuator/*` gehen ans Backend, alles andere ans Frontend.
+
 ---
 
 ## Aufgabe 1 – Zwei Repos, zwei Pipelines
@@ -44,6 +48,11 @@ Beide Repos haben `.github/workflows/deploy.yml` mit dem gleichen Ablauf:
 - **Frontend:** Multi-Stage-Dockerfile (Node baut mit Vite → nginx liefert `dist/` aus). `VITE_API_BASE_URL` kommt aus der GitHub-Variable gleichen Namens = ALB-URL.
 - **Backend:** Multi-Stage-Dockerfile (JDK + Maven baut das Jar → schlankes `eclipse-temurin:21-jre-alpine`).
 
+Workflow-Runs: Push auf `main` = nur Test + Build, Tag `v1.0.0` = mit Deploy:
+
+![Actions Backend](img/03-actions-backend.png)
+![Actions Frontend](img/04-actions-frontend.png)
+
 ### Versionierung mit Git-Tags
 
 Der Git-Tag bestimmt den Image-Tag in ECR. Beide Repos verwenden dasselbe SemVer-Schema:
@@ -57,8 +66,10 @@ git push origin v1.0.0
 damit man in ECS sieht, welche Version läuft, und gezielt zurückrollen kann.
 `0.0.0` / `0.0.1` = einmalige Start-Images, lokal gepusht, damit die ECS-Services angelegt werden konnten (ab `v1.0.0` macht das die Pipeline).
 
-📸 *Screenshot: ECR-Repos mit Tags `1.0.0` / `sha-…`*
-📸 *Screenshot: Workflow-Runs (Push auf main = ohne Deploy, Tag = mit Deploy)*
+Der Tag `v1.0.0` landet als `1.0.0` in ECR, zusammen mit `sha-<commit>` (= Commit des Tags):
+
+![ECR Backend](img/06-ecr-backend.png)
+![ECR Frontend](img/07-ecr-frontend.png)
 
 ---
 
@@ -83,7 +94,7 @@ damit man in ECS sieht, welche Version läuft, und gezielt zurückrollen kann.
   direkt aus Secrets Manager in den Container. Im Code und im Repo steht kein Passwort.
 - Nachweis: `http://<alb>/actuator/health` zeigt `"db": {"status": "UP", "database": "MariaDB"}`.
 
-📸 *Screenshot: RDS-Instanz + `/actuator/health`*
+![RDS-Instanz](img/11-rds.png)
 
 ### S3 (Mitarbeiterfotos, Fortsetzung RefCard04)
 
@@ -101,6 +112,10 @@ curl http://<alb>/v1/employees/1/photo -o foto-download.jpg
 aws s3 ls s3://biztrips-photos-851725276744/
 ```
 
+Das Foto liegt in S3 (hochgeladen 14:32) und hat mehrere Redeploys überlebt (Container ersetzt, Daten noch da):
+
+![Foto in S3](img/12-s3-objects.png)
+
 ### IAM Least Privilege – und warum es im Learner Lab anders läuft
 
 Eigentlich würde man eine eigene Task-Rolle mit genau dieser Policy erstellen ([`s3-least-privilege-policy.json`](s3-least-privilege-policy.json)):
@@ -117,8 +132,6 @@ Darum läuft der Backend-Task mit der vorgegebenen `LabRole` als `taskRoleArn`. 
 schränkt eine **Bucket-Policy** ([`s3-bucket-policy.json`](s3-bucket-policy.json)) den Zugriff auf Objekte ein.
 Lesen und Schreiben dürfen nur `LabRole` (Backend) und `voclabs` (mein Lab-User für Kontrolle und Screenshots), alle anderen werden per `Deny` blockiert.
 
-📸 *Screenshot: S3-Bucket mit hochgeladenem Foto + Bucket-Policy*
-
 ---
 
 ## Aufgabe 3 – ECS: zwei Services, Redeploy, Zugangsdaten
@@ -132,7 +145,8 @@ Lesen und Schreiben dürfen nur `LabRole` (Backend) und `voclabs` (mein Lab-User
   (`amazon-ecs-deploy-task-definition`, wartet auf Stabilität). Danach prüft ein Health-Check-Step per `curl` über den ALB,
   ob die neue Version wirklich läuft. Sonst wird der Workflow rot.
 
-📸 *Screenshot: ECS-Cluster mit beiden Services + neue Task-Definition-Revision nach einem Tag*
+![ECS-Cluster mit beiden Services](img/08-ecs-services.png)
+![Backend-Deployments: Rolling Update von Revision 3 auf 4, Circuit Breaker aktiv](img/09-ecs-backend-deployments.png)
 
 ### Zugangsdaten: Learner Lab statt OIDC
 
@@ -199,7 +213,7 @@ docker compose -f compose/docker-compose.yml up --build
 - Lokal gibt es kein S3. Die Fotos landen im Docker-Volume `photos`, die DB-Daten im Volume `db-data`.
 - Stoppen mit `docker compose -f compose/docker-compose.yml down` (`-v` löscht zusätzlich die Daten).
 
-📸 *Screenshot: `docker compose ps` + Frontend auf localhost:5173*
+![docker compose ps](img/21-compose-ps.png)
 
 ---
 
@@ -216,10 +230,11 @@ aws rds stop-db-instance --db-instance-identifier biztrips-db   # startet nach 7
 ## Screenshot-Checkliste
 
 - [ ] Commits (beide Repos) + Git-Tags
-- [ ] Workflow-Runs grün, inkl. Health-Check-Step
-- [ ] ECR: beide Repos mit Versions-Tags
-- [ ] ECS: Cluster, beide Services „Running“, Task-Definition-Revisionen
-- [ ] RDS-Instanz „Available“
-- [ ] S3-Bucket mit Foto + Bucket-Policy
-- [ ] App im Browser über die ALB-URL
+- [x] Workflow-Runs grün (Push auf `main` = Test + Build, Tag `v1.0.0` = mit Deploy)
+- [x] ECR: beide Repos mit Versions-Tags
+- [x] ECS: Cluster, beide Services „Running“, Task-Definition-Revisionen
+- [x] RDS-Instanz „Available“
+- [x] S3-Bucket mit Foto
+- [x] App im Browser über die ALB-URL
 - [ ] GitHub → Settings → Secrets (nur Namen sichtbar)
+- [x] Lokal: `docker compose ps` (db + backend healthy, frontend läuft)

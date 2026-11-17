@@ -1,5 +1,8 @@
 # RefCard 03 – Spring Boot Backend + MariaDB
 
+> **RefCard05 (Fullstack auf AWS):** Dokumentation für Frontend + Backend → [docs/RefCard05.md](docs/RefCard05.md)
+> · Frontend-Repo: https://github.com/JulianNagel/refcard05-frontend
+
 REST-API-Backend für die BusinessTrips-Applikation (Mitarbeitende, Business
 Trips, Flüge, Meetings). Teil der CI/CD-Übungssequenz **RefCard 02–05**
 (siehe [`docs/future/RefCard-03-RefCard-05-own-repos.md`](docs/future/RefCard-03-RefCard-05-own-repos.md))
