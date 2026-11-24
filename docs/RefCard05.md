@@ -1,7 +1,4 @@
-# RefCard05 – Fullstack auf AWS (ECR, ECS, RDS, S3)
-
-Kurz gesagt: Frontend und Backend haben je ein eigenes Repo, eine eigene Pipeline, ein eigenes ECR-Repo und einen eigenen
-ECS-Service. Die Datenbank läuft auf RDS, Mitarbeiterfotos landen in S3. Ein Load Balancer (ALB) bündelt alles unter einer URL.
+# RefCard05 – Documentation
 
 - Backend: https://github.com/JulianNagel/refcard05-backend
 - Frontend: https://github.com/JulianNagel/refcard05-frontend
@@ -66,8 +63,6 @@ git push origin v1.0.0
 damit man in ECS sieht, welche Version läuft, und gezielt zurückrollen kann.
 `0.0.0` / `0.0.1` = einmalige Start-Images, lokal gepusht, damit die ECS-Services angelegt werden konnten (ab `v1.0.0` macht das die Pipeline).
 
-Der Tag `v1.0.0` landet als `1.0.0` in ECR, zusammen mit `sha-<commit>` (= Commit des Tags):
-
 ![ECR Backend](img/06-ecr-backend.png)
 ![ECR Frontend](img/07-ecr-frontend.png)
 
@@ -104,7 +99,7 @@ Der Tag `v1.0.0` landet als `1.0.0` in ECR, zusammen mit `sha-<commit>` (= Commi
 - `FileStorageService`: Ist `APP_STORAGE_S3_BUCKET` gesetzt, wird nach S3 geschrieben, sonst in einen lokalen Ordner (Tests, Compose).
   In der DB steht nur der Dateiname/S3-Key (UUID), nicht das Bild selbst.
 - Bucket `biztrips-photos-851725276744`: Public Access komplett blockiert.
-- Fehlerfälle: falscher Dateityp gibt `400`, fehlende S3-Rechte geben `502` mit AWS-Fehlercode statt eines Stacktraces.
+- Fehlerfälle beim Upload: falscher Dateityp gibt `400`, ein S3-Fehler (z. B. fehlende Rechte) gibt `502` mit AWS-Fehlercode statt eines Stacktraces.
 
 ```bash
 curl -F "file=@foto.jpg;type=image/jpeg" http://<alb>/v1/employees/1/photo
@@ -112,7 +107,7 @@ curl http://<alb>/v1/employees/1/photo -o foto-download.jpg
 aws s3 ls s3://biztrips-photos-851725276744/
 ```
 
-Das Foto liegt in S3 (hochgeladen 14:32) und hat mehrere Redeploys überlebt (Container ersetzt, Daten noch da):
+Das hochgeladene Foto liegt in S3 und hat mehrere Redeploys überlebt (Container ersetzt, Daten noch da):
 
 ![Foto in S3](img/12-s3-objects.png)
 
@@ -130,7 +125,7 @@ aws iam create-role --role-name biztrips-backend-s3-task-role ...
 
 Darum läuft der Backend-Task mit der vorgegebenen `LabRole` als `taskRoleArn`. Damit der Bucket trotzdem abgeschottet ist,
 schränkt eine **Bucket-Policy** ([`s3-bucket-policy.json`](s3-bucket-policy.json)) den Zugriff auf Objekte ein.
-Lesen und Schreiben dürfen nur `LabRole` (Backend) und `voclabs` (mein Lab-User für Kontrolle und Screenshots), alle anderen werden per `Deny` blockiert.
+Lesen und Schreiben dürfen nur `LabRole` (Backend) und `voclabs` (Lab-User, zur Kontrolle), alle anderen werden per `Deny` blockiert.
 
 ---
 
@@ -220,27 +215,3 @@ docker compose -f compose/docker-compose.yml up --build
 - Stoppen mit `docker compose -f compose/docker-compose.yml down` (`-v` löscht zusätzlich die Daten).
 
 ![docker compose ps](img/21-compose-ps.png)
-
----
-
-## Aufräumen (Lab-Budget!)
-
-RDS, ALB und Fargate kosten auch dann, wenn niemand die App benutzt. Nach der Bewertung:
-
-```bash
-aws ecs update-service --cluster biztrips-cluster --service biztrips-backend-service  --desired-count 0
-aws ecs update-service --cluster biztrips-cluster --service biztrips-frontend-service --desired-count 0
-aws rds stop-db-instance --db-instance-identifier biztrips-db   # startet nach 7 Tagen automatisch wieder
-```
-
-## Screenshot-Checkliste
-
-- [ ] Commits (beide Repos) + Git-Tags
-- [x] Workflow-Runs grün (Push auf `main` = Test + Build, Tag `v1.0.0` = mit Deploy)
-- [x] ECR: beide Repos mit Versions-Tags
-- [x] ECS: Cluster, beide Services „Running“, Task-Definition-Revisionen
-- [x] RDS-Instanz „Available“
-- [x] S3-Bucket mit Foto
-- [x] App im Browser über die ALB-URL
-- [ ] GitHub → Settings → Secrets (nur Namen sichtbar)
-- [x] Lokal: `docker compose ps` (db + backend healthy, frontend läuft)
